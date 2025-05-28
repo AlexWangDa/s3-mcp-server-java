@@ -72,12 +72,11 @@ public class S3Service {
                 s3Bucket = new S3Bucket(b);
             }
         }
-        if (s3Bucket == null) {
-            return s3Bucket;
-        } else {
+        if (s3Bucket != null) {
             s3Bucket.setLocation(s3Client.getBucketLocation(bucket));
-            return s3Bucket;
         }
+        return s3Bucket;
+
     }
 
 
