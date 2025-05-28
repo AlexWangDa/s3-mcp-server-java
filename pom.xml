@@ -12,11 +12,11 @@
 
     <groupId>com.example</groupId>
 
-    <artifactId>mcp-inspur-oss-stdio-server</artifactId>
+    <artifactId>s3-mcp-server</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 
-    <name>Spring AI MCP INSPUR OSS STDIO server</name>
-    <description>Sample Spring Boot application demonstrating MCP stdio server usage</description>
+    <name>Spring AI MCP S3 STDIO server</name>
+    <description>Spring Boot application demonstrating MCP stdio server usage</description>
 
 
     <dependencyManagement>
