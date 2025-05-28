@@ -64,68 +64,69 @@ public class S3Service {
 
     }
 
-    //todo 查询桶信息
-
-    @Tool(description = "查询某个桶的信息，返回桶的拥有者（owner）、桶所在区域（location）、桶的创建日期（creationDate），如果桶不存在则返回null。")
-    public S3Bucket getBucketInfo(@ToolParam(description = "桶名") String bucket) {
-        S3Bucket S3Bucket=null;
-        for (Bucket b:s3Client.listBuckets()){
-            if (b.getName().equals(bucket)){
-               S3Bucket=new S3Bucket(b);
+    @Tool(description = "Retrieve bucket information including owner, region, and creation date, returning null if the bucket does not exist.")
+    public S3Bucket getBucketInfo(@ToolParam(description = "Bucket Name") String bucket) {
+        S3Bucket S3Bucket = null;
+        for (Bucket b : s3Client.listBuckets()) {
+            if (b.getName().equals(bucket)) {
+                S3Bucket = new S3Bucket(b);
             }
         }
-        if (S3Bucket==null){
+        if (S3Bucket == null) {
             return S3Bucket;
-        }else{
+        } else {
             S3Bucket.setLocation(s3Client.getBucketLocation(bucket));
             return S3Bucket;
         }
     }
 
 
-
-    @Tool(description = "下载某个对象到本地的某个路径。")
-    public String downloadObject(@ToolParam(description = "对象的全路径名称") String key,
-                                 @ToolParam(description = "对象所在桶") String bucket,
-                                 @ToolParam(description = "需要下载到的本地的全路径，需要带上文件名") String path) {
-        GetObjectRequest getObjectRequest=new GetObjectRequest(bucket,key);
-        s3Client.getObject(getObjectRequest,new File(path));
+    @Tool(description = "Download an object to a specified local file path.")
+    public String downloadObject(@ToolParam(description = "The full path key of the object") String key,
+                                 @ToolParam(description = "Bucket containing the object") String bucket,
+                                 @ToolParam(description = "Absolute local file path with filename for downloading") String path) {
+        GetObjectRequest getObjectRequest = new GetObjectRequest(bucket, key);
+        s3Client.getObject(getObjectRequest, new File(path));
         return "success";
     }
 
 
-    @Tool(description = "查询文件列表,请注意每次最多返回100个结果，如果想要查询更多，需要多次调用本接口，将返回的NextMarker作为下一次的marker。返回值包含了文件列表（objects,其中的每一条含有文件名（key）、文件创建时间(modifyTime)、存储类型（storageClass）、文件大小（size）、文件etag）、文件夹列表(folders)、下一次遍历开始的marker（NextMarker）。")
-    public S3ListObjectsResult listObjects(@ToolParam(description = "需要查询的桶") String bucket,
-                                           @ToolParam(description = "从哪个文件开始往后查询，此参数可以不传，不传就意味着从最开头开始查询。") String marker,
-                                           @ToolParam(description = "文件的前缀是什么，可以填文件夹全路径，就代表着查询该文件夹下的文件。此参数可以不传。") String prefix,
-                                           @ToolParam(description = "对Object名字进行分组的字符。所有Object名字包含指定的前缀，第一次出现delimiter字符之间的Object作为一组元素（即folders）。此参数可以不传。") String delimiter,
-                                           @ToolParam(description = "指定返回Object的最大数。如果因为max-keys的设定无法一次完成列举，返回结果会附加NextMarker元素作为下一次列举的marker。如不传此参数，默认为100。此参数最多传100，如果想查询超过100的列表，需要多次调用本接口。") Integer maxKeys) {
+    @Tool(description = "List objects with pagination (max 100 results per call). Use NextMarker for subsequent requests. Returns: object list (each with key, modifyTime, storageClass, size, etag), folder list, NextMarker for continuation.")
+    public S3ListObjectsResult listObjects(
+            @ToolParam(description = "Target bucket for object listing") String bucket,
+            @ToolParam(description = "Starting marker key for pagination (optional, begins from start if omitted)") String marker,
+            @ToolParam(description = "Object key prefix filter (e.g. folder path, optional)") String prefix,
+            @ToolParam(description = "Directory grouping delimiter character (optional)") String delimiter,
+            @ToolParam(description = "Maximum objects to return (1-100, defaults to 100 if omitted)") Integer maxKeys) {
         ListObjectsRequest listObjectsRequest = new ListObjectsRequest();
         listObjectsRequest.setBucketName(bucket);
         listObjectsRequest.setPrefix(prefix);
         listObjectsRequest.setMarker(marker);
-        listObjectsRequest.setDelimiter(StringUtils.isNullOrEmpty(delimiter)? "/" : delimiter);
+        listObjectsRequest.setDelimiter(StringUtils.isNullOrEmpty(delimiter) ? "/" : delimiter);
         listObjectsRequest.setMaxKeys(maxKeys == null ? 100 : maxKeys);
         listObjectsRequest.setEncodingType("UTF-8");
         return new S3ListObjectsResult(s3Client.listObjects(listObjectsRequest));
     }
 
 
-    @Tool(description = "获取某个对象的分享链接，通过该分享链接，可以在十五分钟内访问到私有权限的对象。")
-    public String getObjectUrl(@ToolParam(description = "对象的全路径名称") String key,
-                               @ToolParam(description = "对象所在桶") String bucket) {
+    @Tool(description = "Generate a time-limited presigned URL (15-minute validity) for accessing private objects")
+    public String generatePresignedUrl(
+            @ToolParam(description = "Complete object key path in S3 namespace") String key,
+            @ToolParam(description = "Target bucket containing the object") String bucket) {
         return s3Client.generatePresignedUrl(bucket, key, null).toString();
     }
 
-    @Tool(description = "查询某个对象的信息。")
-    public ObjectMetadata getObjectInfo(@ToolParam(description = "对象的全路径名称") String key,
-                                        @ToolParam(description = "对象所在桶") String bucket) {
+    @Tool(description = "Retrieve technical metadata for a specific object")
+    public ObjectMetadata getObjectMetadata(
+            @ToolParam(description = "Complete object key path in S3 namespace") String key,
+            @ToolParam(description = "Target bucket containing the object") String bucket) {
         return s3Client.getObject(bucket, key).getObjectMetadata();
     }
 
-    @Tool(description = "在桶中创建一个文件夹。")
-    public String createFolder(@ToolParam(description = "文件夹的全路径名称(最后需要带上一个/，如aaa/aab/folder/)") String folder,
-                               @ToolParam(description = "文件夹所在的桶") String bucket) {
+    @Tool(description = "Create a virtual directory in the specified bucket (Note: Implemented by uploading an empty object with trailing '/')")
+    public String createDirectory(
+            @ToolParam(description = "Full path of the virtual directory ending with '/' (e.g. 'aaa/aab/folder/')") String folder,
+            @ToolParam(description = "Target bucket for directory creation") String bucket) {
         if (!folder.endsWith("/")) {
             folder = folder + "/";
         }
@@ -135,17 +136,18 @@ public class S3Service {
     }
 
 
-    @Tool(description = "查询桶列表,返回值包含了桶的名字，桶的创建时间,桶的创建人的uid")
+    @Tool(description = "List all S3 buckets with metadata including bucket name, creation timestamp, and owner's canonical user ID")
     public List<Bucket> getBucketList() {
         return s3Client.listBuckets();
     }
 
 
-    @Tool(description = "向指定的桶内上传文件,上传完成后返回下载链接。")
-    public String putObject(@ToolParam(description = "要命名为的文件名") String key,
-                            @ToolParam(description = "要传的桶") String bucket,
-                            @ToolParam(description = "需要上传的文件的本地路径") String in) throws FileNotFoundException {
-        s3Client.putObject(bucket, key, new FileInputStream(in), null);
+    @Tool(description = "Upload a local file to S3 bucket and return its presigned download URL with default 15-minute validity")
+    public String uploadObject(
+            @ToolParam(description = "Full object key path in S3 namespace (including any prefix directories)") String key,
+            @ToolParam(description = "Target bucket for object storage") String bucket,
+            @ToolParam(description = "Absolute local filesystem path of the source file") String filePath) throws FileNotFoundException {
+        s3Client.putObject(bucket, key, new FileInputStream(filePath), null);
         return s3Client.generatePresignedUrl(bucket, key, new Date(System.currentTimeMillis() + 900000L)).toString();
     }
 
