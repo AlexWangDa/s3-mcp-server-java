@@ -66,17 +66,17 @@ public class S3Service {
 
     @Tool(description = "Retrieve bucket information including owner, region, and creation date, returning null if the bucket does not exist.")
     public S3Bucket getBucketInfo(@ToolParam(description = "Bucket Name") String bucket) {
-        S3Bucket S3Bucket = null;
+        S3Bucket s3Bucket = null;
         for (Bucket b : s3Client.listBuckets()) {
             if (b.getName().equals(bucket)) {
-                S3Bucket = new S3Bucket(b);
+                s3Bucket = new S3Bucket(b);
             }
         }
-        if (S3Bucket == null) {
-            return S3Bucket;
+        if (s3Bucket == null) {
+            return s3Bucket;
         } else {
-            S3Bucket.setLocation(s3Client.getBucketLocation(bucket));
-            return S3Bucket;
+            s3Bucket.setLocation(s3Client.getBucketLocation(bucket));
+            return s3Bucket;
         }
     }
 
@@ -91,7 +91,7 @@ public class S3Service {
     }
 
 
-    @Tool(description = "List objects with pagination (max 100 results per call). Use NextMarker for subsequent requests. Returns: object list (each with key, modifyTime, storageClass, size, etag), folder list, NextMarker for continuation.")
+    @Tool(description = "List objects with pagination (max 100 results per call). Use NextMarker for subsequent requests. Returns: object list (each with key, modifyTime, storageClass, size, eTag), folder list, NextMarker for continuation.")
     public S3ListObjectsResult listObjects(
             @ToolParam(description = "Target bucket for object listing") String bucket,
             @ToolParam(description = "Starting marker key for pagination (optional, begins from start if omitted)") String marker,
