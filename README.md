@@ -1,4 +1,4 @@
-# S3-MCP-Server-Java [![Java CI](https://github.com/yourusername/s3-mcp-server-java/actions/workflows/maven.yml/badge.svg)](https://github.com/yourusername/s3-mcp-server-java/actions)
+# S3-MCP-Server-Java 
 
 A Spring AI-based STDIO server implementing S3 protocol operations for Amazon S3 and S3-compatible object storage services.
 
