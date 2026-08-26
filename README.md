@@ -1,126 +1,136 @@
-# S3-MCP-Server-Java 
+# S3 MCP Server Java
 
-A Spring AI-based STDIO server implementing S3 protocol operations for Amazon S3 and S3-compatible object storage services.
+A Spring Boot 4.1.1 and Spring AI 2.0.0 MCP server that exposes Amazon S3 and
+S3-compatible storage through STDIO. It uses AWS SDK for Java v2 and requires
+Java 17 or newer.
 
-## Features
+## Five-minute quick start
 
-- 🚀 S3 protocol compatible operations
-- 🔄 Spring AI-powered processing
-- ☁️ Supports Amazon S3 and all S3-compatible services
-
-## Quick Start
-
-### Prerequisites
-
-- Java 17+
-- Maven 3.8+
-
-### Installation
+Build the executable JAR with the checked-in Maven Wrapper, then run it with an
+AWS profile inherited from your shell:
 
 ```bash
-git clone https://github.com/AlexWangDa/s3-mcp-server-java
-cd s3-mcp-server-java
-mvn clean install
+./mvnw clean package
+export AWS_PROFILE=my-profile
+java -jar target/s3-mcp-server-0.2.0-SNAPSHOT.jar --s3.region=us-east-1
 ```
 
+The server writes MCP protocol messages to stdout and diagnostics to stderr.
+To keep diagnostics in a file instead, add
+`--logging.file.name=/absolute/path/s3-mcp.log` to the Java command.
 
-## MCP Integration
+The server starts in remote read-only mode. Set `S3_READ_ONLY=false` only when
+`uploadObject` and `createDirectory` should be enabled. File transfers are
+contained below `S3_LOCAL_ROOT` (default: the current working directory), and
+normalized paths and symlinks are rejected if they escape that root. Set an
+explicit root such as `S3_LOCAL_ROOT=/absolute/safe/path` before enabling file
+tools in an MCP host.
 
-Add to your MCP configuration file:
+## MinIO and compatible services
+
+For a local MinIO server already listening on port 9000, export the following
+values before starting the JAR:
+
+```bash
+export S3_ENDPOINT=http://localhost:9000
+export S3_REGION=us-east-1
+export S3_ACCESS_KEY=replace-me
+export S3_SECRET_KEY=replace-me
+export S3_PATH_STYLE_ACCESS=true
+export S3_LOCAL_ROOT=/absolute/safe/path
+export S3_READ_ONLY=true
+```
+
+Use the credentials configured for your local MinIO instance. Change
+`S3_READ_ONLY` to `false` only for intentional write tests. `.env.example`
+contains the same safe starting values; load them using your shell or process
+manager because the application does not read dotenv files automatically.
+
+## Configuration
+
+Spring Boot maps environment names to the corresponding command-line property.
+Explicit access and secret keys must be provided together; otherwise the AWS
+SDK default credential chain is used (profiles, standard AWS environment
+variables, container credentials, or instance roles).
+
+| Environment variable | Property | Default / purpose |
+| --- | --- | --- |
+| `S3_ENDPOINT` | `s3.endpoint` | AWS endpoint; custom endpoints require a region |
+| `S3_REGION` | `s3.region` | AWS default region chain |
+| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | `s3.access-key` / `s3.secret-key` | AWS default credential chain |
+| `S3_SESSION_TOKEN` | `s3.session-token` | Optional token for explicit temporary credentials |
+| `S3_PATH_STYLE_ACCESS` | `s3.path-style-access` | `false`; commonly `true` for MinIO |
+| `S3_PRESIGN_DURATION` | `s3.presign-duration` | `PT15M` (valid range: 1 minute to 7 days) |
+| `S3_LOCAL_ROOT` | `s3.local-root` | `.`; containment root for upload/download paths |
+| `S3_READ_ONLY` | `s3.read-only` | `true`; blocks remote mutations |
+| `S3_ALLOWED_BUCKETS` | `s3.allowed-buckets` | Empty; optional comma-separated allowlist |
+| `S3_ALLOWED_PREFIXES` | `s3.allowed-prefixes` | Empty; optional comma-separated key-prefix allowlist |
+| `S3_ALLOW_LOCAL_OVERWRITE` | `s3.allow-local-overwrite` | `false`; protects existing download destinations |
+
+## MCP host configuration
+
+Credentials are deliberately absent from these examples. Configure an AWS
+profile or AWS environment variables in the process that launches the MCP host.
+
+Claude Desktop configuration:
 
 ```json
 {
   "mcpServers": {
-    "s3-mcp-server": {
+    "s3": {
       "command": "java",
       "args": [
         "-jar",
-        "/path/to/your/s3-mcp-server-0.0.1-SNAPSHOT.jar",
-        "--s3.endpoint=your_endpoint",
-        "--s3s.accessKey=your_access_key",
-        "--s3.secretKey=your_secret_key"
+        "/absolute/path/to/s3-mcp-server-0.2.0-SNAPSHOT.jar",
+        "--s3.region=us-east-1",
+        "--s3.local-root=/absolute/safe/path"
       ]
     }
   }
 }
 ```
 
-## Key Parameters
+Cursor `.cursor/mcp.json`:
 
+```json
+{
+  "mcpServers": {
+    "s3": {
+      "command": "java",
+      "args": [
+        "-jar",
+        "/absolute/path/to/s3-mcp-server-0.2.0-SNAPSHOT.jar",
+        "--s3.region=us-east-1",
+        "--s3.local-root=/absolute/safe/path"
+      ]
+    }
+  }
+}
+```
 
-| Parameter      | Description                    | Example                           |
-| -------------- | ------------------------------ | --------------------------------- |
-| `s3.endpoint`  | S3-compatible service endpoint | oss.cn-north-3.inspurcloudoss.com |
-| `s3.accessKey` | Access key for authentication  | NTQtNDQxYy00NTgyL                 |
-| `s3.secretKey` | Secret key for authentication  | ZEtM2Y1YS00MjIzL                  |
+Restart the host after changing its configuration. Desktop applications may not
+inherit variables from an interactive shell, so set credentials in the host's
+launch environment or use the AWS shared credentials/profile files.
 
+## Available tools
 
-## Features
+- `getBucketList` and `getBucketInfo`
+- `listObjects` and `getObjectMetadata`
+- `generatePresignedUrl`
+- `downloadObject` (local write below `s3.local-root`)
+- `uploadObject` and `createDirectory` (disabled while read-only)
 
-### Core Operations
+## Development and testing
 
-- 📦 **Bucket Management**
-  - List all buckets with metadata (`getBucketList`)
-  - Retrieve detailed bucket info including location and creation date (`getBucketInfo`)
+```bash
+./mvnw -B test
+./mvnw -B clean verify
+```
 
-### Object Operations
-
-- 📥 **File Transfer**
-  - Upload local files with auto-generated presigned URLs (`uploadObject`)
-  - Download objects to specified local paths (`downloadObject`)
-
-### Advanced Features
-
-- 🔍 **Object Discovery**
-  - Paginated object listing with prefix filtering and NextMarker support (`listObjects`)
-  - Virtual directory creation via empty object markers (`createDirectory`)
-
-### Security & Access
-
-- 🔑 **Presigned URLs**
-  - Generate 15-minute valid URLs for private object access (`generatePresignedUrl`)
-  - Automatic URL generation on upload operations
-
-### Metadata Management
-
-- 📄 **Object Inspection**
-  - Retrieve technical metadata including ETag, storage class, and size (`getObjectMetadata`)
-
-### Technical Implementation
-
-- 🌐 **S3 Protocol Implementation**
-  - AWS SDK-based client with HTTP protocol configuration
-  - Path-style access and global bucket access enabled
-  - UTF-8 encoding support for object listings
-  - Automatic directory marker normalization (appends trailing '/' if missing)
-
-### Compatibility
-
-- ☁️ **Multi-Provider Support**
-  - Works with Amazon S3 and any S3-compatible storage
-  - Tested with Inspur OSS (official implementation example)
-
-### Spring AI Integration
-
-- 🤖 **Tool Annotations**
-  - @Tool-annotated service methods for AI integration
-  - Parameter validation through @ToolParam descriptors
-
-
-
-## Test Instructions
-
-Please query the list of buckets in my object storage, then retrieve information about the first bucket and present it in a readable format. Next, list the first 200 files in the bucket. Query the details of the 200th file, download it to the current working directory, and generate a shareable link for the file.
-
-Afterward, create a folder named "mcp" within the bucket. Generate a 1000-word essay on the theme "S3 Java MCP," save it as a local TXT file, upload it to the "mcp" folder, and finally generate a downloadable URL for this file.
-
-
-## Notes
-
-1. Always keep credentials secure - never commit them to version control
-2. Test with different S3-compatible providers (AWS, MinIO, InspurOSS, etc.)
-
+The first command runs unit tests. The second performs the full build, including
+JUnit integration tests backed by Testcontainers and MinIO; it requires Docker.
+CI verifies the project on Java 17 and 21.
 
 ## License
 
-Apache 2.0
+Apache License 2.0.
