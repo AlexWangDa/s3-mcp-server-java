@@ -60,6 +60,10 @@ public final class LocalPathPolicy {
 				checked = candidate.toRealPath();
 			}
 			else if (mustExist) {
+				checked = nearestExistingAncestor(candidate);
+				if (!checked.startsWith(this.root)) {
+					throw new S3ToolException(PATH_OUTSIDE_ROOT, "Symlink escapes s3.local-root");
+				}
 				return candidate;
 			}
 			else {
@@ -77,6 +81,17 @@ public final class LocalPathPolicy {
 		catch (InvalidPathException | IOException ex) {
 			throw new S3ToolException(PATH_OUTSIDE_ROOT, "Local path cannot be resolved", ex);
 		}
+	}
+
+	private Path nearestExistingAncestor(Path candidate) throws IOException {
+		Path ancestor = candidate.getParent();
+		while (ancestor != null && !Files.exists(ancestor, LinkOption.NOFOLLOW_LINKS)) {
+			ancestor = ancestor.getParent();
+		}
+		if (ancestor == null) {
+			throw new IOException("Local path has no existing ancestor");
+		}
+		return ancestor.toRealPath();
 	}
 
 }

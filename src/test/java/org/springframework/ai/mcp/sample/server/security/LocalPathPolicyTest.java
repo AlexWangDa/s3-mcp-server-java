@@ -53,6 +53,18 @@ class LocalPathPolicyTest {
 	}
 
 	@Test
+	void rejectsMissingUploadBelowSymlinkOutsideLocalRoot() throws IOException {
+		Path root = Files.createDirectory(temporaryDirectory.resolve("root"));
+		Path outsideDirectory = Files.createDirectory(temporaryDirectory.resolve("outside"));
+		Files.createSymbolicLink(root.resolve("escape"), outsideDirectory);
+		LocalPathPolicy paths = paths(root, false);
+
+		assertThatThrownBy(() -> paths.resolveUpload("escape/missing.txt"))
+			.isInstanceOf(S3ToolException.class)
+			.hasMessageContaining("PATH_OUTSIDE_ROOT");
+	}
+
+	@Test
 	void rejectsMissingUploadSource() throws IOException {
 		LocalPathPolicy paths = paths(false);
 
