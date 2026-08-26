@@ -41,6 +41,12 @@ class S3PropertiesTest {
 	}
 
 	@Test
+	void rejectsSessionTokenWithoutExplicitCredentials() {
+		runner.withPropertyValues("s3.session-token=test-token")
+			.run(context -> assertThat(context).hasFailed());
+	}
+
+	@Test
 	void bindsExplicitSessionCredentialsAndLists() {
 		runner.withPropertyValues(
 				"s3.access-key=test-access", "s3.secret-key=test-secret",

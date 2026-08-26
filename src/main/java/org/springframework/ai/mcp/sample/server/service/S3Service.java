@@ -20,12 +20,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
 
-
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.Protocol;
+
 import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.auth.BasicSessionCredentials;
+import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
@@ -44,34 +47,65 @@ import org.springframework.stereotype.Service;
 @Service
 public class S3Service {
 
+	private final S3Properties properties;
 
-    AmazonS3 s3Client;
+	private volatile AmazonS3 s3Client;
 
     public S3Service(S3Properties properties) {
-        AWSCredentials credentials = new BasicAWSCredentials(properties.accessKey()
-                , properties.secretKey());
-        ClientConfiguration configuration = new ClientConfiguration();
-        configuration.setProtocol(Protocol.HTTP);
-        this.s3Client = AmazonS3ClientBuilder.standard()
-                .withCredentials(new AWSStaticCredentialsProvider(credentials))
-                .withClientConfiguration(configuration)
-                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(properties.endpoint().toString(), properties.region()))
-                .enableForceGlobalBucketAccess()
-                .enablePathStyleAccess()
-                .build();
+        this.properties = properties;
+    }
+
+	AWSCredentialsProvider credentialsProvider() {
+		if (!org.springframework.util.StringUtils.hasText(properties.accessKey())) {
+			return DefaultAWSCredentialsProviderChain.getInstance();
+		}
+		AWSCredentials credentials = org.springframework.util.StringUtils.hasText(properties.sessionToken())
+				? new BasicSessionCredentials(properties.accessKey(), properties.secretKey(), properties.sessionToken())
+				: new BasicAWSCredentials(properties.accessKey(), properties.secretKey());
+		return new AWSStaticCredentialsProvider(credentials);
+    }
+
+	AmazonS3ClientBuilder clientBuilder() {
+		ClientConfiguration clientConfiguration = new ClientConfiguration();
+		clientConfiguration.setProtocol(Protocol.HTTPS);
+		AmazonS3ClientBuilder builder = AmazonS3ClientBuilder.standard()
+				.withCredentials(credentialsProvider())
+				.withClientConfiguration(clientConfiguration);
+		if (properties.endpoint() != null) {
+			builder.withEndpointConfiguration(
+					new AwsClientBuilder.EndpointConfiguration(properties.endpoint().toString(), properties.region()));
+		}
+		else if (org.springframework.util.StringUtils.hasText(properties.region())) {
+			builder.withRegion(properties.region());
+		}
+		return builder.withPathStyleAccessEnabled(properties.pathStyleAccess()).enableForceGlobalBucketAccess();
+    }
+
+	private AmazonS3 s3Client() {
+		AmazonS3 currentClient = s3Client;
+		if (currentClient == null) {
+			synchronized (this) {
+				currentClient = s3Client;
+				if (currentClient == null) {
+					currentClient = clientBuilder().build();
+					s3Client = currentClient;
+				}
+			}
+		}
+		return currentClient;
 
     }
 
     @Tool(description = "Retrieve bucket information including owner, region, and creation date, returning null if the bucket does not exist.")
     public S3Bucket getBucketInfo(@ToolParam(description = "Bucket Name") String bucket) {
         S3Bucket s3Bucket = null;
-        for (Bucket b : s3Client.listBuckets()) {
+        for (Bucket b : s3Client().listBuckets()) {
             if (b.getName().equals(bucket)) {
                 s3Bucket = new S3Bucket(b);
             }
         }
         if (s3Bucket != null) {
-            s3Bucket.setLocation(s3Client.getBucketLocation(bucket));
+            s3Bucket.setLocation(s3Client().getBucketLocation(bucket));
         }
         return s3Bucket;
 
@@ -83,7 +117,7 @@ public class S3Service {
                                  @ToolParam(description = "Bucket containing the object") String bucket,
                                  @ToolParam(description = "Absolute local file path with filename for downloading") String path) {
         GetObjectRequest getObjectRequest = new GetObjectRequest(bucket, key);
-        s3Client.getObject(getObjectRequest, new File(path));
+        s3Client().getObject(getObjectRequest, new File(path));
         return "success";
     }
 
@@ -102,7 +136,7 @@ public class S3Service {
         listObjectsRequest.setDelimiter(StringUtils.isNullOrEmpty(delimiter) ? "/" : delimiter);
         listObjectsRequest.setMaxKeys(maxKeys == null ? 100 : maxKeys);
         listObjectsRequest.setEncodingType("UTF-8");
-        return new S3ListObjectsResult(s3Client.listObjects(listObjectsRequest));
+        return new S3ListObjectsResult(s3Client().listObjects(listObjectsRequest));
     }
 
 
@@ -110,14 +144,14 @@ public class S3Service {
     public String generatePresignedUrl(
             @ToolParam(description = "Complete object key path in S3 namespace") String key,
             @ToolParam(description = "Target bucket containing the object") String bucket) {
-        return s3Client.generatePresignedUrl(bucket, key, null).toString();
+        return s3Client().generatePresignedUrl(bucket, key, null).toString();
     }
 
     @Tool(description = "Retrieve technical metadata for a specific object")
     public ObjectMetadata getObjectMetadata(
             @ToolParam(description = "Complete object key path in S3 namespace") String key,
             @ToolParam(description = "Target bucket containing the object") String bucket) {
-        return s3Client.getObject(bucket, key).getObjectMetadata();
+        return s3Client().getObject(bucket, key).getObjectMetadata();
     }
 
     @Tool(description = "Create a virtual directory in the specified bucket (Note: Implemented by uploading an empty object with trailing '/')")
@@ -128,14 +162,14 @@ public class S3Service {
             folder = folder + "/";
         }
         InputStream inputStream = new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8));
-        s3Client.putObject(bucket, folder, inputStream, null);
+        s3Client().putObject(bucket, folder, inputStream, null);
         return "success";
     }
 
 
     @Tool(description = "List all S3 buckets with metadata including bucket name, creation timestamp, and owner's canonical user ID")
     public List<Bucket> getBucketList() {
-        return s3Client.listBuckets();
+        return s3Client().listBuckets();
     }
 
 
@@ -144,8 +178,8 @@ public class S3Service {
             @ToolParam(description = "Full object key path in S3 namespace (including any prefix directories)") String key,
             @ToolParam(description = "Target bucket for object storage") String bucket,
             @ToolParam(description = "Absolute local filesystem path of the source file") String filePath) throws FileNotFoundException {
-        s3Client.putObject(bucket, key, new FileInputStream(filePath), null);
-        return s3Client.generatePresignedUrl(bucket, key, new Date(System.currentTimeMillis() + 900000L)).toString();
+        s3Client().putObject(bucket, key, new FileInputStream(filePath), null);
+        return s3Client().generatePresignedUrl(bucket, key, new Date(System.currentTimeMillis() + 900000L)).toString();
     }
 
 
