@@ -16,7 +16,7 @@ java -jar target/s3-mcp-server-0.2.0-SNAPSHOT.jar --s3.region=us-east-1
 ```
 
 The server writes MCP protocol messages to stdout and diagnostics to stderr.
-To keep diagnostics in a file instead, add
+To also write diagnostics to a file, add
 `--logging.file.name=/absolute/path/s3-mcp.log` to the Java command.
 
 The server starts in remote read-only mode. Set `S3_READ_ONLY=false` only when

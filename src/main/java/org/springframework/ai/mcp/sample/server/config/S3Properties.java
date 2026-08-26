@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.List;
 
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.NotBlank;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
@@ -25,7 +26,7 @@ public record S3Properties(
 		@DefaultValue(".") Path localRoot,
 		@DefaultValue("true") boolean readOnly,
 		List<String> allowedBuckets,
-		List<String> allowedPrefixes,
+		List<@NotBlank String> allowedPrefixes,
 		@DefaultValue("false") boolean allowLocalOverwrite) {
 
 	public S3Properties {

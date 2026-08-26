@@ -30,7 +30,9 @@ public final class S3AccessPolicy {
 	public void requireObject(String bucket, String key) {
 		requireBucket(bucket);
 		if (!StringUtils.hasText(key) || !this.properties.allowedPrefixes().isEmpty()
-				&& this.properties.allowedPrefixes().stream().noneMatch(key::startsWith)) {
+				&& this.properties.allowedPrefixes().stream()
+					.filter(StringUtils::hasText)
+					.noneMatch(key::startsWith)) {
 			throw new S3ToolException(ACCESS_DENIED, "Object key is not allowed");
 		}
 	}

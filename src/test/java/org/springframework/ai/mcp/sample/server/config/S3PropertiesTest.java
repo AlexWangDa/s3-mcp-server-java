@@ -25,6 +25,7 @@ class S3PropertiesTest {
 			assertThat(properties.presignDuration()).isEqualTo(Duration.ofMinutes(15));
 			assertThat(properties.pathStyleAccess()).isFalse();
 			assertThat(properties.allowLocalOverwrite()).isFalse();
+			assertThat(properties.allowedPrefixes()).isEmpty();
 		});
 	}
 
@@ -59,6 +60,18 @@ class S3PropertiesTest {
 				assertThat(properties.allowedPrefixes()).containsExactly("safe/");
 				assertThat(properties.localRoot()).isEqualTo(Path.of("build/files"));
 			});
+	}
+
+	@Test
+	void rejectsBlankIndexedAllowedPrefix() {
+		runner.withPropertyValues("s3.allowed-prefixes[0]=safe/", "s3.allowed-prefixes[1]=")
+			.run(context -> assertThat(context).hasFailed());
+	}
+
+	@Test
+	void rejectsTrailingBlankCommaSeparatedAllowedPrefix() {
+		runner.withPropertyValues("s3.allowed-prefixes=safe/,")
+			.run(context -> assertThat(context).hasFailed());
 	}
 
 	@ParameterizedTest

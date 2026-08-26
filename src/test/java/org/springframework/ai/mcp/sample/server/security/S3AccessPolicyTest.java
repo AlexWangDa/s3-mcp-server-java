@@ -37,6 +37,23 @@ class S3AccessPolicyTest {
 	}
 
 	@Test
+	void emptyPrefixAllowListAllowsAnyNonBlankKey() {
+		S3AccessPolicy access = access(false, List.of(), List.of());
+
+		assertThatCode(() -> access.requireObject("any-bucket", "private/report.pdf"))
+			.doesNotThrowAnyException();
+	}
+
+	@Test
+	void blankConfiguredPrefixCannotBypassNonEmptyAllowList() {
+		S3AccessPolicy access = access(false, List.of("allowed-bucket"), List.of("safe/", ""));
+
+		assertThatThrownBy(() -> access.requireObject("allowed-bucket", "private/report.pdf"))
+			.isInstanceOf(S3ToolException.class)
+			.hasMessageContaining("ACCESS_DENIED");
+	}
+
+	@Test
 	void rejectsMutationsWhenReadOnly() {
 		S3AccessPolicy access = access(true, List.of(), List.of());
 
