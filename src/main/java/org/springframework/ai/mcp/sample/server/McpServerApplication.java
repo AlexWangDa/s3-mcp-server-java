@@ -7,29 +7,17 @@ import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 @SpringBootApplication
+@ConfigurationPropertiesScan
 public class McpServerApplication {
-	public  static String endpoint;
-	public static String ak;
-	public static String sk;
 	private static final Logger log = LoggerFactory.getLogger(McpServerApplication.class);
 
 	public static void main(String[] args) {
-		for (String s:args){
-			if (s.startsWith("--s3.endpoint")){
-				endpoint=s.split("=")[1];
-			}
-			if (s.startsWith("--s3.accessKey")){
-				ak=s.split("=")[1];
-			}
-			if (s.startsWith("--s3.secretKey")){
-				sk=s.split("=")[1];
-			}
-		}
 		SpringApplication.run(McpServerApplication.class, args);
 	}
 

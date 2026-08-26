@@ -34,14 +34,12 @@ import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.ListObjectsRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.util.StringUtils;
+import org.springframework.ai.mcp.sample.server.config.S3Properties;
 import org.springframework.ai.mcp.sample.server.entity.S3Bucket;
 import org.springframework.ai.mcp.sample.server.entity.S3ListObjectsResult;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
-
-import static org.springframework.ai.mcp.sample.server.McpServerApplication.*;
-
 
 @Service
 public class S3Service {
@@ -49,15 +47,15 @@ public class S3Service {
 
     AmazonS3 s3Client;
 
-    public S3Service() {
-        AWSCredentials credentials = new BasicAWSCredentials(ak
-                , sk);
+    public S3Service(S3Properties properties) {
+        AWSCredentials credentials = new BasicAWSCredentials(properties.accessKey()
+                , properties.secretKey());
         ClientConfiguration configuration = new ClientConfiguration();
         configuration.setProtocol(Protocol.HTTP);
         this.s3Client = AmazonS3ClientBuilder.standard()
                 .withCredentials(new AWSStaticCredentialsProvider(credentials))
                 .withClientConfiguration(configuration)
-                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endpoint, "cn-north-3a"))
+                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(properties.endpoint().toString(), properties.region()))
                 .enableForceGlobalBucketAccess()
                 .enablePathStyleAccess()
                 .build();
