@@ -18,12 +18,14 @@ package org.springframework.ai.mcp.sample.server.service;
 import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static org.springframework.ai.mcp.sample.server.exception.S3ErrorCode.ACCESS_DENIED;
+import static org.springframework.ai.mcp.sample.server.exception.S3ErrorCode.LOCAL_FILE_EXISTS;
 import static org.springframework.ai.mcp.sample.server.exception.S3ErrorCode.NOT_FOUND;
 import static org.springframework.ai.mcp.sample.server.exception.S3ErrorCode.S3_ERROR;
 
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.CopyOption;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -110,6 +112,12 @@ public class S3Service {
 					GetObjectRequest.builder().bucket(bucket).key(key).build(), downloadTarget));
 			moveDownload(temporary, destination);
 			return new S3OperationResult(true, bucket, key, "Downloaded object", null);
+		}
+		catch (FileAlreadyExistsException exception) {
+			S3ToolException wrapped = new S3ToolException(LOCAL_FILE_EXISTS,
+					"Download destination already exists", exception);
+			transferFailure = wrapped;
+			throw wrapped;
 		}
 		catch (IOException exception) {
 			S3ToolException wrapped = new S3ToolException(S3_ERROR,
@@ -226,18 +234,28 @@ public class S3Service {
 	}
 
 	private void moveDownload(Path temporary, Path destination) throws IOException {
-		CopyOption[] atomicOptions = this.properties.allowLocalOverwrite()
-				? new CopyOption[] { ATOMIC_MOVE, REPLACE_EXISTING }
-				: new CopyOption[] { ATOMIC_MOVE };
+		if (!this.properties.allowLocalOverwrite()) {
+			publishWithoutOverwrite(temporary, destination);
+			return;
+		}
+		CopyOption[] atomicOptions = new CopyOption[] { ATOMIC_MOVE, REPLACE_EXISTING };
 		try {
 			Files.move(temporary, destination, atomicOptions);
 		}
 		catch (AtomicMoveNotSupportedException exception) {
-			CopyOption[] fallbackOptions = this.properties.allowLocalOverwrite()
-					? new CopyOption[] { REPLACE_EXISTING }
-					: new CopyOption[0];
-			Files.move(temporary, destination, fallbackOptions);
+			Files.move(temporary, destination, REPLACE_EXISTING);
 		}
+	}
+
+	private void publishWithoutOverwrite(Path temporary, Path destination) throws IOException {
+		try {
+			Files.createLink(destination, temporary);
+		}
+		catch (UnsupportedOperationException exception) {
+			Files.move(temporary, destination);
+			return;
+		}
+		Files.delete(temporary);
 	}
 
 	private void cleanupTemporaryFile(Path temporary, Throwable transferFailure) {

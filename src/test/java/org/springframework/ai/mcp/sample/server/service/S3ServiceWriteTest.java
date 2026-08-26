@@ -164,6 +164,27 @@ class S3ServiceWriteTest {
 	}
 
 	@Test
+	void doesNotClobberDestinationCreatedWhileDownloadIsInFlight() throws Exception {
+		Path directory = Files.createDirectory(this.root.resolve("downloads"));
+		Path destination = directory.resolve("report.pdf");
+		when(this.s3.getObject(any(GetObjectRequest.class), any(Path.class))).thenAnswer(invocation -> {
+			Files.writeString(invocation.getArgument(1), "downloaded");
+			Files.writeString(destination, "created-by-another-process");
+			return GetObjectResponse.builder().contentLength(10L).build();
+		});
+
+		assertThatThrownBy(() -> service(true).downloadObject("docs/report.pdf", "reports",
+				"downloads/report.pdf"))
+			.isInstanceOfSatisfying(S3ToolException.class,
+					exception -> assertThat(exception.code()).isEqualTo(S3ErrorCode.LOCAL_FILE_EXISTS));
+
+		assertThat(destination).hasContent("created-by-another-process");
+		try (var files = Files.list(directory)) {
+			assertThat(files).containsExactly(destination);
+		}
+	}
+
+	@Test
 	void uploadsAContainedFileAndReturnsItsPresignedUrl() throws Exception {
 		Path source = Files.writeString(this.root.resolve("upload.txt"), "content");
 		when(this.s3.putObject(any(PutObjectRequest.class), any(Path.class)))
