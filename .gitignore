@@ -1,6 +1,9 @@
 # Compiled class file
 *.class
 
+# Local development worktrees
+.worktrees/
+
 # Log file
 *.log
 
