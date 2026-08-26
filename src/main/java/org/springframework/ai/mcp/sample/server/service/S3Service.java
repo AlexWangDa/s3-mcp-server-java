@@ -15,10 +15,16 @@
  */
 package org.springframework.ai.mcp.sample.server.service;
 
+import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static org.springframework.ai.mcp.sample.server.exception.S3ErrorCode.ACCESS_DENIED;
 import static org.springframework.ai.mcp.sample.server.exception.S3ErrorCode.NOT_FOUND;
 import static org.springframework.ai.mcp.sample.server.exception.S3ErrorCode.S3_ERROR;
 
+import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.CopyOption;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.function.Supplier;
@@ -86,16 +92,38 @@ public class S3Service {
 		return new S3Bucket(found.name(), found.owner(), found.creationDate(), location);
 	}
 
-	@Tool(description = "Download an object to a specified local file path.")
+	@Tool(description = "Writes a file below the configured local root and does not modify S3.")
 	public S3OperationResult downloadObject(
 			@ToolParam(description = "The full path key of the object") String key,
 			@ToolParam(description = "Bucket containing the object") String bucket,
 			@ToolParam(description = "Absolute local file path with filename for downloading") String path) {
 		this.access.requireObject(bucket, key);
 		Path destination = this.paths.resolveDownload(path);
-		awsCall(resource(bucket, key),
-				() -> this.s3.getObject(GetObjectRequest.builder().bucket(bucket).key(key).build(), destination));
-		return new S3OperationResult(true, bucket, key, "Downloaded object", null);
+		Path temporary = null;
+		Throwable transferFailure = null;
+		try {
+			temporary = Files.createTempFile(destination.getParent(), ".s3-mcp-", ".part");
+			// The SDK Path response transformer requires a destination that does not exist.
+			Files.delete(temporary);
+			Path downloadTarget = temporary;
+			awsCall(resource(bucket, key), () -> this.s3.getObject(
+					GetObjectRequest.builder().bucket(bucket).key(key).build(), downloadTarget));
+			moveDownload(temporary, destination);
+			return new S3OperationResult(true, bucket, key, "Downloaded object", null);
+		}
+		catch (IOException exception) {
+			S3ToolException wrapped = new S3ToolException(S3_ERROR,
+					"Local file transfer failed for " + resource(bucket, key), exception);
+			transferFailure = wrapped;
+			throw wrapped;
+		}
+		catch (RuntimeException exception) {
+			transferFailure = exception;
+			throw exception;
+		}
+		finally {
+			cleanupTemporaryFile(temporary, transferFailure);
+		}
 	}
 
 	@Tool(description = "List objects with pagination (max 100 results per call). Use NextMarker for subsequent requests. Returns: object list (each with key, modifyTime, storageClass, size, eTag), folder list, NextMarker for continuation.")
@@ -152,7 +180,7 @@ public class S3Service {
 				response.lastModified(), response.metadata());
 	}
 
-	@Tool(description = "Create a virtual directory in the specified bucket (Note: Implemented by uploading an empty object with trailing '/')")
+	@Tool(description = "Creates a zero-byte S3 object ending in '/'; disabled in read-only mode.")
 	public S3OperationResult createDirectory(
 			@ToolParam(description = "Full path of the virtual directory ending with '/' (e.g. 'aaa/aab/folder/')") String folder,
 			@ToolParam(description = "Target bucket for directory creation") String bucket) {
@@ -175,7 +203,7 @@ public class S3Service {
 			.toList();
 	}
 
-	@Tool(description = "Upload a local file to S3 bucket and return its presigned download URL")
+	@Tool(description = "Reads a file below the configured local root and mutates S3; disabled in read-only mode.")
 	public S3OperationResult uploadObject(
 			@ToolParam(description = "Full object key path in S3 namespace (including any prefix directories)") String key,
 			@ToolParam(description = "Target bucket for object storage") String bucket,
@@ -194,6 +222,38 @@ public class S3Service {
 		}
 		catch (S3Exception exception) {
 			throw translate(exception, resource);
+		}
+	}
+
+	private void moveDownload(Path temporary, Path destination) throws IOException {
+		CopyOption[] atomicOptions = this.properties.allowLocalOverwrite()
+				? new CopyOption[] { ATOMIC_MOVE, REPLACE_EXISTING }
+				: new CopyOption[] { ATOMIC_MOVE };
+		try {
+			Files.move(temporary, destination, atomicOptions);
+		}
+		catch (AtomicMoveNotSupportedException exception) {
+			CopyOption[] fallbackOptions = this.properties.allowLocalOverwrite()
+					? new CopyOption[] { REPLACE_EXISTING }
+					: new CopyOption[0];
+			Files.move(temporary, destination, fallbackOptions);
+		}
+	}
+
+	private void cleanupTemporaryFile(Path temporary, Throwable transferFailure) {
+		if (temporary == null) {
+			return;
+		}
+		try {
+			Files.deleteIfExists(temporary);
+		}
+		catch (IOException exception) {
+			if (transferFailure != null) {
+				transferFailure.addSuppressed(exception);
+			}
+			else {
+				throw new S3ToolException(S3_ERROR, "Could not clean up temporary download file", exception);
+			}
 		}
 	}
 
