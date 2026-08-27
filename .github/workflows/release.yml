@@ -18,6 +18,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -29,7 +31,7 @@ jobs:
         shell: bash
         run: |
           version="$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)"
-          if [[ "$version" == *-SNAPSHOT ]]; then
+          if [[ "${version#*-SNAPSHOT}" != "$version" ]]; then
             echo "Refusing to release snapshot version: $version" >&2
             exit 1
           fi
