@@ -1,0 +1,22 @@
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.err</target>
+        <encoder><pattern>${CONSOLE_LOG_PATTERN}</pattern></encoder>
+    </appender>
+    <condition class="ch.qos.logback.core.boolex.IsPropertyDefinedCondition">
+        <key>LOG_FILE</key>
+    </condition>
+    <if>
+        <then>
+            <include resource="org/springframework/boot/logging/logback/file-appender.xml"/>
+            <root level="INFO">
+                <appender-ref ref="STDERR"/>
+                <appender-ref ref="FILE"/>
+            </root>
+        </then>
+        <else>
+            <root level="INFO"><appender-ref ref="STDERR"/></root>
+        </else>
+    </if>
+</configuration>

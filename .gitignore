@@ -1,6 +1,12 @@
 # Compiled class file
 *.class
 
+# Maven build output
+/target/
+
+# Local development worktrees
+.worktrees/
+
 # Log file
 *.log
 
