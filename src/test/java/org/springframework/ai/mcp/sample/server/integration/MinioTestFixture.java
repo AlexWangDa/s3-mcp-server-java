@@ -14,7 +14,7 @@ final class MinioTestFixture {
 	}
 
 	static GenericContainer<?> createContainer() {
-		return new GenericContainer<>(DockerImageName.parse("minio/minio:RELEASE.2025-10-15T17-29-55Z"))
+		return new GenericContainer<>(DockerImageName.parse("minio/minio:RELEASE.2025-09-07T16-13-09Z"))
 			.withEnv("MINIO_ROOT_USER", ACCESS_KEY)
 			.withEnv("MINIO_ROOT_PASSWORD", SECRET_KEY)
 			.withCommand("server /data")
