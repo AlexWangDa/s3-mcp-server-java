@@ -19,7 +19,7 @@ class LoggingStdioIT {
 
 	@Test
 	void configuredFileLoggingWritesDiagnosticsWithoutUsingStdout() throws IOException, InterruptedException {
-		Path jar = Path.of("target", "s3-mcp-server-0.2.0-SNAPSHOT.jar");
+		Path jar = Path.of("target", "s3-mcp-server-0.2.0.jar");
 		Path logFile = this.tempDirectory.resolve("server.log");
 		Path stdoutFile = this.tempDirectory.resolve("stdout.log");
 		Path stderrFile = this.tempDirectory.resolve("stderr.log");
