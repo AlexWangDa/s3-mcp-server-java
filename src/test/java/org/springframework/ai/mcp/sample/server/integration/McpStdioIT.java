@@ -25,7 +25,7 @@ class McpStdioIT {
 
 	@Test
 	void packagedJarServesAllS3ToolsOverStdio() {
-		Path jar = Path.of("target", "s3-mcp-server-0.2.0-SNAPSHOT.jar");
+		Path jar = Path.of("target", "s3-mcp-server-0.2.0.jar");
 		assertThat(jar).isRegularFile();
 
 		String minioEndpoint = "http://" + MINIO.getHost() + ":" + MINIO.getMappedPort(9000);

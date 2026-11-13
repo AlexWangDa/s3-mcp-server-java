@@ -51,7 +51,7 @@ Run it with an AWS profile inherited from your shell:
 
 ```bash
 export AWS_PROFILE=my-profile
-java -jar target/s3-mcp-server-0.2.0-SNAPSHOT.jar \
+java -jar target/s3-mcp-server-0.2.0.jar \
   --s3.region=us-east-1 \
   --s3.local-root=/absolute/path/to/safe/files
 ```
@@ -79,7 +79,7 @@ Cursor's `.cursor/mcp.json`:
       "command": "java",
       "args": [
         "-jar",
-        "/absolute/path/to/s3-mcp-server-0.2.0-SNAPSHOT.jar",
+        "/absolute/path/to/s3-mcp-server-0.2.0.jar",
         "--s3.region=us-east-1",
         "--s3.local-root=/absolute/path/to/safe/files"
       ]

@@ -13,7 +13,7 @@ Use the checked-in Maven Wrapper so local and CI builds use the same Maven versi
 - `./mvnw -B clean verify` runs all checks, including Failsafe integration tests; Docker is required for Testcontainers.
 - `./mvnw -B -Dtest=S3ServiceReadTest test` runs one test class while iterating.
 
-Run the packaged server with `java -jar target/s3-mcp-server-0.2.0-SNAPSHOT.jar --s3.region=us-east-1`. Keep stdout reserved for MCP traffic.
+Run the packaged server with `java -jar target/s3-mcp-server-0.2.0.jar --s3.region=us-east-1`. Keep stdout reserved for MCP traffic.
 
 ## Coding Style & Naming Conventions
 
